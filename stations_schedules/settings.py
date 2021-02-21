@@ -13,8 +13,8 @@ import os
 
 from pathlib import Path
 
-# Key for Yandex API.Rasp
-API_KEY = 'e6613242-c237-4d43-bb41-1b89714d089c'
+# Ключ для работоспособности API
+API_KEY = ''
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 

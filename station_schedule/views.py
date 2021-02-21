@@ -3,18 +3,26 @@ import json
 
 from django.conf import settings
 from django.db import transaction
-from django.shortcuts import HttpResponseRedirect
+from django.shortcuts import HttpResponseRedirect, HttpResponse
 
 from .models import Stations
 
 
+# Координаты Волгограда
+LATITUDE_VLG = 48.7194
+LONGITUDE_VLG = 44.5018
+# Макс. дистанция в км
+MAX_DISTANCE = 50
+
+
 def find_stations_and_create_entries(request):
+    html = '<html><body>{}</body></html>'
     url = 'https://api.rasp.yandex.net/v3.0/nearest_stations'
     url_params = dict(
         apikey=settings.API_KEY,
-        lat=48.7194,
-        lng=44.5018,
-        distance=50,
+        lat=LATITUDE_VLG,
+        lng=LONGITUDE_VLG,
+        distance=MAX_DISTANCE,
     )
     response = requests.get(
         url,
@@ -24,22 +32,33 @@ def find_stations_and_create_entries(request):
         data = json.loads(response.text)
         stations = data.get('stations', {})
         if stations:
-            exist_stations = tuple(Stations.objects.values_list(
-                'code',
-                flat=True,
-            ).all())
             for station in stations:
+                code = station.get('code', '')
+                default_params = dict(
+                    type=station.get('type', ''),
+                    station_type=station.get('station_type', ''),
+                    station_type_name=station.get('station_type_name', ''),
+                    title=station.get('title', ''),
+                    transport_type=station.get('transport_type', ''),
+                    schedule='',
+                )
                 with transaction.atomic():
-                    if station['code'] not in exist_stations:
-                        Stations.objects.create(
-                            code=station.get('code', ''),
-                            type=station.get('type', ''),
-                            station_type=station.get('station_type', ''),
-                            station_type_name=station.get('station_type_name', ''),
-                            title=station.get('title', ''),
-                            transport_type=station.get('transport_type', ''),
+                    try:
+                        Stations.objects.update_or_create(
+                            code=code,
+                            defaults=default_params,
                         )
-    return HttpResponseRedirect('/admin/')
+                    except Stations.MultipleObjectsReturned:
+                        return HttpResponse(
+                            html.format(
+                                f'Найдено несколько станций с кодом {code}. Импорт прерван.',
+                            ),
+                        )
+    return HttpResponse(
+        html.format(
+            'Импорт успешно завершен',
+        ),
+    )
 
 
 def find_schedule_by_station_code(request, queryset=None):
@@ -66,13 +85,12 @@ def find_schedule_by_station_code(request, queryset=None):
                 title = thread.get('title', '') if thread else ''
                 arrival = schedule.get('arrival', '')
                 departure = schedule.get('departure', '')
-                entry = f"{title} {arrival} {departure}<br>"
+                entry = f"<b>Маршрут:</b> {title}, <b>прибытие:</b> {arrival}, <b>убытие:</b> {departure}.<br>"
                 result.append(entry)
-
-            Stations.objects.filter(
-                code=station_code,
-            ).update(
-                schedule=''.join(result),
-            )
-
+            with transaction.atomic():
+                Stations.objects.filter(
+                    code=station_code,
+                ).update(
+                    schedule=''.join(result),
+                )
     return HttpResponseRedirect('')
