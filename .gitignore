@@ -1,0 +1,4 @@
+.idea
+web_bb_venv
+*.pyc
+*.sqlite3

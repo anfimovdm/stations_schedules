@@ -1,0 +1,9 @@
+{% extends "admin/index.html" %}
+{% block content%}
+    <p>
+        <a href="{% url 'station_schedule:find_stations_and_create_entries' %}">
+            Импорт ближайших станций к городу Волгоград и сохранить их в БД
+        </a>
+    </p>
+    {{ block.super }}
+{% endblock %}
